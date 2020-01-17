@@ -1,6 +1,5 @@
 #include "TCPClient.h"
 #include <thread>
-#include <chrono> 
 #include <ctime>
 #include <regex>
 #include "exceptions.h"
@@ -66,7 +65,7 @@ void TCPClient::connectTo(const char *ip_addr, unsigned short port) {
 
 void TCPClient::handleConnection() {
 
-	while (!connClosed) {
+	while (!connClosed && !connectionBroke) {
 		// check if we got any new messages from the server
 		this->mtx1.lock();
 		if(!this->receivedMessages.empty()) {
@@ -79,6 +78,10 @@ void TCPClient::handleConnection() {
 		}
 		this->mtx1.unlock();
 	}
+
+	// check for broken connection
+	if (this->connectionBroke) 
+		throw std::runtime_error("Failed to receive heartbeat from server for 8 seconds!");
 }
 
 bool TCPClient::sendData(std::string data) {
@@ -97,12 +100,23 @@ std::string TCPClient::receiveData() {
 	}
 
 	std::string response(buffer);
+
 	return response;
 }
 
 void TCPClient::receivingThread() {
-	while (!connClosed) {
+	while (!connClosed && !connectionBroke) {
 		auto response = receiveData();
+
+		// check for heartbeat from server
+		std::chrono::system_clock::time_point now = std::chrono::system_clock::now(); // get current time
+		if (response.compare("HEARTBEAT\n") == 0) {
+			this->lastTimeHeartBeatReceived = now;
+			continue; // don't push HB's to end user
+		} else { // check if it has been > 8 seconds since last hb
+			if (now - this->lastTimeHeartBeatReceived > std::chrono::seconds(8))
+				this->connectionBroke = true; // signal we have a broken connection
+		}
 
 		this->mtx1.lock();
 		this->receivedMessages.push(response);
@@ -111,7 +125,7 @@ void TCPClient::receivingThread() {
 }
 
 void TCPClient::sendingThread() {
-	while (!connClosed) {
+	while (!connClosed && !connectionBroke) {
 		std::string clientMessage;
 		std::cin >> clientMessage;
 

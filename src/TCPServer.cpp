@@ -84,7 +84,28 @@ void TCPServer::listenSvr() {
 	}
 }
 
+/*
+	Sends heartbeat every 3 seconds to client
+*/
+void TCPServer::heartbeatThread(int conn) {
+	std::string hbStr = "HEARTBEAT\n";
+
+	while (true) {
+		std::this_thread::sleep_for(std::chrono::seconds(3));
+
+		try {
+			send(conn, hbStr.c_str(), hbStr.length(), 0);
+		} catch (std::exception& e) {
+			throw std::runtime_error("Failed to send heartbeat to client!");
+		}
+	}
+}
+
 void TCPServer::clientThread(int conn) {
+	// start heartbeat thread with client
+	std::thread hbThread(&TCPServer::heartbeatThread, this, conn);
+	hbThread.detach();
+
 	// send client menu
 	auto menuStr = getClientMenu();
 	try {

@@ -24,6 +24,7 @@ public:
    void bindSvr(const char *ip_addr, unsigned short port);
    void listenSvr();
    void shutdown();
+   void heartbeatThread(int conn);
 
 private:
  int sockfd = -1;

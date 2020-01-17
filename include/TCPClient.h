@@ -12,6 +12,7 @@
 #include <string>
 #include <queue>
 #include <mutex>
+#include <chrono> 
 
 // The amount to read in before we send a packet
 const unsigned int stdin_bufsize = 50;
@@ -38,6 +39,8 @@ private:
 	 int sockfd;
 	 struct sockaddr_in server;
 	 bool connClosed = false;
+	 bool connectionBroke = false;
+	 std::chrono::system_clock::time_point lastTimeHeartBeatReceived = std::chrono::system_clock::now();;
 
 	 std::queue<std::string> receivedMessages;
 	 std::mutex mtx1;
